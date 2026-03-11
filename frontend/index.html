@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horizontal Pod Autoscaler Simulator</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-titles">
+                <h1>Horizontal Pod Autoscaler Simulator</h1>
+                <p>Interactive demonstration of Kubernetes HPA behavior under varying CPU loads.</p>
+            </div>
+            <div class="status-indicator">
+                <span id="system-status-badge" class="badge stable">System Stable</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="dashboard-grid">
+            <!-- Left Column: Controls & Info -->
+            <div class="left-col">
+                <!-- Pod Information Panel -->
+                <section class="panel pod-info-panel">
+                    <h2>Pod Information</h2>
+                    <div class="info-cards">
+                        <div class="info-card">
+                            <span class="label">Running Pods</span>
+                            <span class="value highlight" id="current-pods">2</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CPU Controls -->
+                <section class="panel control-panel">
+                    <h2>CPU Load Control</h2>
+                    <div class="cpu-display">
+                        <span class="cpu-value" id="cpu-value-display">20%</span>
+                    </div>
+                    <input type="range" id="cpu-slider" class="range-slider" min="0" max="100" value="20">
+                    <div class="control-buttons">
+                        <button id="btn-decrease" class="btn btn-secondary">- Decrease Load</button>
+                        <button id="btn-increase" class="btn btn-primary">+ Increase Load</button>
+                    </div>
+                </section>
+
+                <!-- Logs Panel -->
+                <section class="panel log-panel">
+                    <h2>Scaling Event Logs</h2>
+                    <div class="log-container" id="log-container">
+                        <!-- Logs injected here via JS -->
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Column: Visualization & Graphs -->
+            <div class="right-col">
+                <!-- Pod Visualization -->
+                <section class="panel visualization-panel">
+                    <h2>Pod Cluster Visualization</h2>
+                    <div class="pod-container" id="pod-container">
+                        <!-- Pods injected here via JS -->
+                    </div>
+                </section>
+
+                <!-- Graphs Panel -->
+                <section class="panel graphs-panel">
+                    <h2>Metrics</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="cpuChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="podChart"></canvas>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
