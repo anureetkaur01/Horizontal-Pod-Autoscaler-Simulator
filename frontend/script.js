@@ -5,13 +5,14 @@ const CONFIG = {
     scaleUpThreshold: 70, // %
     scaleDownThreshold: 30, // %
     initialCpu: 50,
-    initialPods: 1,
+    initialPods: 3,
     chartUpdateIntervalMs: 1000,
     maxDataPoints: 30,
     targetCpu: 50 // New HPA target CPU
 };
 
 const TARGET_CPU = CONFIG.targetCpu;
+const DEBUG = true; // Set to true for detailed scaling logs
 
 // State
 let state = {
@@ -47,14 +48,6 @@ const els = {
 let cpuChart, podChart;
 Chart.defaults.color = '#8b949e';
 Chart.defaults.font.family = "'Inter', sans-serif";
-function updatePods(count) {
-
-    state.podCount = count;
-
-    els.currentPodsDisplay.textContent = state.podCount;
-
-    renderPods();
-}
 async function checkBackend() {
     try {
         const response = await fetch("http://localhost:5000/pods");
@@ -250,6 +243,7 @@ function renderPods() {
                 <div class="pod-label">Pod ${state.podCounterId}</div>
             `;
             els.podContainer.appendChild(podEl);
+            if (DEBUG) console.log(`[UI] + Added Pod ${state.podCounterId}`);
         }
     } else if (state.podCount < currentDomPods) {
         // Remove pods
@@ -258,10 +252,12 @@ function renderPods() {
             const lastPod = els.podContainer.lastElementChild;
             if (lastPod) {
                 lastPod.classList.add('removing');
+                const podLabel = lastPod.querySelector('.pod-label').textContent;
                 // Wait for animation
                 setTimeout(() => {
                     if (lastPod.parentNode === els.podContainer) {
                         els.podContainer.removeChild(lastPod);
+                        if (DEBUG) console.log(`[UI] - Removed ${podLabel}`);
                     }
                 }, 400); // 400ms match css
             }
@@ -271,6 +267,8 @@ function renderPods() {
 function updatePods(count) {
     const oldPods = state.podCount;
     state.podCount = count;
+
+    if (DEBUG) console.log(`[STATE] Total Pods: ${state.podCount}`);
 
     // Feedback Loop: Adding pods reduces average CPU usage (Load Spreading)
     // This allows the HPA formula to stabilize once the desired pod count is reached.
@@ -351,6 +349,10 @@ async function checkAutoscaling() {
     let desiredPods = Math.ceil(
         state.podCount * (state.cpuUsage / TARGET_CPU)
     );
+
+    if (DEBUG) {
+        console.log(`[DEBUG] CPU: ${state.cpuUsage}% | Current Pods: ${state.podCount} | Desired Pods: ${desiredPods}`);
+    }
 
     // Clamp values between min and max pods
     desiredPods = Math.max(CONFIG.minPods, Math.min(CONFIG.maxPods, desiredPods));

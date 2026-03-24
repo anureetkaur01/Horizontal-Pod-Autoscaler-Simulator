@@ -1,119 +1,89 @@
 # Horizontal-Pod-Autoscaler-Simulator
 
-## Project Overview
+A real-time, interactive simulator for the Kubernetes Horizontal Pod Autoscaler (HPA). This project demonstrates how HPA works by using the actual Kubernetes HPA formula to scale real Docker containers based on simulated CPU load.
 
-This project is a simulation of the Kubernetes Horizontal Pod Autoscaler (HPA).  
-It demonstrates how applications can automatically scale the number of pods based on CPU usage.
+## 🚀 Features
 
-The simulator includes a web dashboard that allows users to adjust CPU load and observe how pods scale up or down automatically,also the pods are represented by real Docker containers.
+- **Real-Time Visualization**: Dashboard showing CPU usage and pod count over time with live charts.
+- **Formula-Based Scaling**: Uses the standard Kubernetes HPA formula:
+  `desiredReplicas = ceil[currentReplicas * (currentCPU / targetCPU)]`
+- **Docker Integration**: Scales real Nginx containers on your local machine to simulate pod scaling.
+- **Interactive UI**: Drag the CPU slider to manually change load or use "Auto Traffic Mode" for dynamic simulation.
+- **Stability Bounds**: Implements a stable range (30-70%) to prevent unnecessary scaling (thrashing).
+- **Graceful Cleanup**: Automatically stops and removes all Docker containers on server shutdown.
 
----
+## 📂 Project Structure
 
-## Features
+- `backend/`: Node.js/Express server that manages Docker containers and provides scaling APIs.
+- `frontend/`: Interactive dashboard built with HTML, Vanilla CSS, and JavaScript (Chart.js).
+- `tests/`: Comprehensive test suite including unit, integration, and load tests.
 
-- CPU usage simulator using slider
-- Automatic scaling logic
-- Pod visualization dashboard
-- Scaling event logs
-- Real-time CPU and pod charts
-- Real Docker containers used to simulate pods
+## 🛠️ Prerequisites
 
----
+- **Node.js**: Installed on your system.
+- **Docker Desktop**: Must be installed and running. The backend uses Docker to simulate pod scaling.
 
-## Technology Stack
+## 🏁 Getting Started
 
-Frontend
-- HTML
-- CSS
-- JavaScript
-- Chart.js
+### 1. Start the Backend
 
-Backend
-- Node.js
-- Express.js
+1.  Navigate to the `backend` directory:
+    ```bash
+    cd backend
+    ```
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Start the server:
+    ```bash
+    npm start
+    ```
+    The backend runs on `http://localhost:5000`. It will initialize with 3 default pods (Docker containers).
 
-Infrastructure
-- Docker
+### 2. Start the Frontend
 
----
+You can run the frontend in two ways:
 
-## Autoscaling Logic
+#### Option A: Using a Simple Server (Recommended)
+This avoids CORS or browser security issues:
+1.  From the project root directory, run:
+    ```bash
+    npx serve frontend
+    ```
+2.  Open the provided URL (usually `http://localhost:3000`) in your browser.
 
-The simulator follows simple scaling rules:
+#### Option B: Open index.html Directly
+1.  Navigate to the `frontend` directory.
+2.  Double-click `index.html` to open it.
+    *Note: Some browser security settings might block API requests to localhost when opening via file protocol.*
 
-If CPU usage > 70%  
-→ Increase pods by 1
+## 🎮 Using the Simulator
 
-If CPU usage < 30%  
-→ Decrease pods by 1
+1.  **CPU Usage Slider**: Drag to simulate CPU load.
+2.  **Auto Traffic Mode**: Toggles simulated fluctuating traffic between 20% and 95%.
+3.  **Scaling Events Log**: Real-time log of HPA decisions and feedback loops.
+4.  **Pod Container**: Visual representation of active "pods" (Docker containers).
 
-Constraints:
+## 🧪 Testing
 
-Minimum pods = 1  
-Maximum pods = 10
+The project includes three types of tests located in the `/tests` directory:
 
-Scaling occurs gradually to simulate real autoscaler behavior.
+- **Unit Tests**: Test the core HPA formula logic in isolation.
+  ```bash
+  node tests/unit_test.js
+  ```
+- **Integration Tests**: Verify the Backend API endpoints (requires backend running).
+  ```bash
+  node tests/integration_test.js
+  ```
+- **Load Simulation**: Simulates a traffic profile to verify HPA convergence.
+  ```bash
+  node tests/load_test.js
+  ```
 
----
+## 🧰 Technologies Used
 
-## Architecture
-
-Frontend Dashboard  
-↓  
-Autoscaler Logic  
-↓  
-Backend API (Node.js)  
-↓  
-Docker CLI  
-↓  
-Containers (Simulated Pods)
-
----
-
-## How to Run the Project
-
-### 1. Install Docker
-Install Docker Desktop and ensure Docker is running.
-
-### 2. Pull the nginx image
-
-docker pull nginx
-
-### 3. Start the backend server
-
-cd backend  
-node server.js
-
-Backend will start on port 5000.
-
-### 4. Open the frontend dashboard
-
-Open:
-
-frontend/index.html
-
-in your browser.
-
-### 5. Test autoscaling
-
-Increase CPU above 70% to scale up pods.
-
-Decrease CPU below 30% to scale down pods.
-
----
-
-## Demo
-
-During scaling events, Docker containers are created or removed automatically.
-
-You can verify this using:
-
-docker ps
-
-Each container represents a simulated pod.
-
----
-
-## Conclusion
-
-This project demonstrates the concept of autoscaling used in Kubernetes by simulating Horizontal Pod Autoscaler behavior using a web dashboard and Docker containers.
+- **Backend**: Node.js, Express, Docker SDK (Child Process)
+- **Frontend**: HTML5, CSS3 (Vanilla), JavaScript (ES6+), Chart.js
+- **Testing**: Node.js core modules

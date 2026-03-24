@@ -11,8 +11,36 @@ app.use(express.json());
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, "../frontend")));
 
-// Initialize with 1 dummy pod to match frontend initial state
-let pods = ["dummy-1"];
+let pods = [];
+
+// Initialize with 3 real pods by starting Docker containers
+function initializeDefaultPods(count) {
+    console.log(`[BOOT] Scaling up to ${count} initial real Docker containers...`);
+    for (let i = 0; i < count; i++) {
+        startContainer((newCount) => {
+            console.log(`[BOOT] Pod ${newCount}/${count} online.`);
+        });
+    }
+}
+
+// Start the boot sequence
+initializeDefaultPods(3);
+
+// Graceful shutdown to stop containers when server ends (Ctrl+C)
+process.on('SIGINT', async () => {
+    console.log("\x1b[33m\nGraceful shutdown... Stopping all containers.\x1b[0m");
+    const stopPromises = pods.map(id => {
+        return new Promise(resolve => {
+            exec(`docker stop ${id} && docker rm ${id}`, (err) => {
+                if (!err) console.log(`Stopped container: ${id}`);
+                resolve();
+            });
+        });
+    });
+    await Promise.all(stopPromises);
+    console.log("Cleanup complete. Exiting.");
+    process.exit(0);
+});
 
 // start container
 function startContainer(callback) {
@@ -36,7 +64,7 @@ function startContainer(callback) {
 // stop container
 function stopContainer(callback) {
 
-    if (pods.length === 0) return;
+    if (pods.length <= 1) return; 
 
     const id = pods.pop();
 
