@@ -18,6 +18,7 @@
                 <p>Interactive demonstration of Kubernetes HPA behavior under varying CPU loads.</p>
             </div>
             <div class="status-indicator">
+                <span id="backend-status-badge" class="badge">Checking Backend...</span>
                 <span id="system-status-badge" class="badge stable">System Stable</span>
             </div>
         </header>
@@ -32,7 +33,7 @@
                     <div class="info-cards">
                         <div class="info-card">
                             <span class="label">Running Pods</span>
-                            <span class="value highlight" id="current-pods">2</span>
+                            <span class="value highlight" id="current-pods">3</span>
                         </div>
                     </div>
                 </section>
@@ -41,12 +42,16 @@
                 <section class="panel control-panel">
                     <h2>CPU Load Control</h2>
                     <div class="cpu-display">
-                        <span class="cpu-value" id="cpu-value-display">20%</span>
+                        <span class="cpu-value" id="cpu-value-display">50%</span>
                     </div>
-                    <input type="range" id="cpu-slider" class="range-slider" min="0" max="100" value="20">
+                    <input type="range" id="cpu-slider" class="range-slider" min="0" max="100" value="50">
                     <div class="control-buttons">
                         <button id="btn-decrease" class="btn btn-secondary">- Decrease Load</button>
                         <button id="btn-increase" class="btn btn-primary">+ Increase Load</button>
+                    </div>
+                    <!-- Auto Traffic Mode Button -->
+                    <div style="margin-top: 15px; text-align: center;">
+                        <button id="auto-mode-btn" class="btn btn-secondary">Start Auto Traffic</button>
                     </div>
                 </section>
 

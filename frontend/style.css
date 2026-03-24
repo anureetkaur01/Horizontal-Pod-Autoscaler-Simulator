@@ -77,6 +77,12 @@ body {
     border: 1px solid rgba(63, 185, 80, 0.3);
 }
 
+.badge.error {
+    background: rgba(218, 54, 51, 0.2);
+    color: #ff7b72;
+    border: 1px solid rgba(218, 54, 51, 0.3);
+}
+
 .badge.scaling-up {
     background: rgba(240, 136, 62, 0.2);
     color: #ffab70;
@@ -87,6 +93,11 @@ body {
     background: rgba(88, 166, 255, 0.2);
     color: #79c0ff;
     border: 1px solid rgba(121, 192, 255, 0.3);
+}
+
+.status-indicator {
+    display: flex;
+    gap: 12px;
 }
 
 /* Grids */
@@ -271,6 +282,11 @@ body {
 
 .log-action-down {
     color: #79c0ff;
+}
+
+.log-error {
+    color: #ff7b72;
+    font-weight: 600;
 }
 
 /* Pod Visualization */

@@ -4,11 +4,14 @@ const CONFIG = {
     maxPods: 10,
     scaleUpThreshold: 70, // %
     scaleDownThreshold: 30, // %
-    initialCpu: 20,
-    initialPods: 2,
+    initialCpu: 50,
+    initialPods: 1,
     chartUpdateIntervalMs: 1000,
-    maxDataPoints: 30
+    maxDataPoints: 30,
+    targetCpu: 50 // New HPA target CPU
 };
+
+const TARGET_CPU = CONFIG.targetCpu;
 
 // State
 let state = {
@@ -21,7 +24,9 @@ let state = {
         cpu: [],
         pods: []
     },
-    podCounterId: CONFIG.initialPods // for generating unique Pod IDs monotonically
+    podCounterId: CONFIG.initialPods, // for generating unique Pod IDs monotonically
+    autoMode: false,
+    autoInterval: null
 };
 
 // DOM Elements
@@ -31,7 +36,9 @@ const els = {
     currentPodsDisplay: document.getElementById('current-pods'),
     btnIncrease: document.getElementById('btn-increase'),
     btnDecrease: document.getElementById('btn-decrease'),
+    autoBtn: document.getElementById('auto-mode-btn'),
     systemStatusBadge: document.getElementById('system-status-badge'),
+    backendStatusBadge: document.getElementById('backend-status-badge'),
     podContainer: document.getElementById('pod-container'),
     logContainer: document.getElementById('log-container')
 };
@@ -48,26 +55,66 @@ function updatePods(count) {
 
     renderPods();
 }
+async function checkBackend() {
+    try {
+        const response = await fetch("http://localhost:5000/pods");
+        if (response.ok) {
+            const data = await response.json();
+            els.backendStatusBadge.textContent = "Backend Connected";
+            els.backendStatusBadge.className = "badge stable";
+            if (data.pods !== state.podCount && !scaleCooldown) {
+                // Synchronize pod count but avoid CPU glitching
+                const oldPods = state.podCount;
+                state.podCount = data.pods;
+                els.currentPodsDisplay.textContent = state.podCount;
+                renderPods();
+                
+                // If it's the first sync or a major mismatch, adjust CPU to prevent 100% spikes
+                if (oldPods === 0 && state.podCount > 0) {
+                   state.cpuUsage = CONFIG.initialCpu;
+                   els.cpuSlider.value = state.cpuUsage;
+                   updateCpuDisplay();
+                }
+            }
+        } else {
+            throw new Error();
+        }
+    } catch (e) {
+        els.backendStatusBadge.textContent = "Backend Disconnected";
+        els.backendStatusBadge.className = "badge error";
+    }
+}
+
 async function scaleUp() {
-
-    const response = await fetch("http://localhost:5000/scale-up", {
-        method: "POST"
-    });
-
-    const data = await response.json();
-
-    updatePods(data.pods);
+    try {
+        const response = await fetch("http://localhost:5000/scale-up", {
+            method: "POST"
+        });
+        if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+        const data = await response.json();
+        updatePods(data.pods);
+        return true;
+    } catch (error) {
+        console.error("Scale up failed:", error);
+        updateLog(`Scale up failed: ${error.message}`, 'log-error');
+        return false;
+    }
 }
 
 async function scaleDown() {
-
-    const response = await fetch("http://localhost:5000/scale-down", {
-        method: "POST"
-    });
-
-    const data = await response.json();
-
-    updatePods(data.pods);
+    try {
+        const response = await fetch("http://localhost:5000/scale-down", {
+            method: "POST"
+        });
+        if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+        const data = await response.json();
+        updatePods(data.pods);
+        return true;
+    } catch (error) {
+        console.error("Scale down failed:", error);
+        updateLog(`Scale down failed: ${error.message}`, 'log-error');
+        return false;
+    }
 }
 function initCharts() {
     const commonOptions = {
@@ -222,7 +269,24 @@ function renderPods() {
     }
 }
 function updatePods(count) {
+    const oldPods = state.podCount;
     state.podCount = count;
+
+    // Feedback Loop: Adding pods reduces average CPU usage (Load Spreading)
+    // This allows the HPA formula to stabilize once the desired pod count is reached.
+    if (oldPods > 0 && count > 0 && oldPods !== count) {
+        let totalLoad = state.cpuUsage * oldPods;
+        state.cpuUsage = Math.max(1, Math.min(100, Math.round(totalLoad / count)));
+        els.cpuSlider.value = state.cpuUsage;
+        updateCpuDisplay();
+    } else if (count === 0) {
+        // If no pods exist, CPU usage per pod is technically undefined or 100%
+        // But for simulation, let's keep it at 100% to represent overloaded state
+        state.cpuUsage = 100;
+        els.cpuSlider.value = state.cpuUsage;
+        updateCpuDisplay();
+    }
+
     els.currentPodsDisplay.textContent = state.podCount;
     renderPods();
 }
@@ -254,63 +318,74 @@ function updateCpuDisplay() {
     }
 }
 
+function startAutoMode() {
+    state.autoInterval = setInterval(async () => {
+        let base = 20;
+        let fluctuation = Math.floor(Math.random() * 76); // 20 to 95
+        let newCpu = base + fluctuation;
+        await setCpu(newCpu);
+    }, 3000);
+}
+
+function stopAutoMode() {
+    clearInterval(state.autoInterval);
+    state.autoInterval = null;
+}
+
 // Core Autoscaling Logic Function
 let scaleCooldown = false;
 async function checkAutoscaling() {
-
     if (scaleCooldown) return;
 
-    const oldPodCount = state.podCount;
-    let didScale = false;
-
-    // SCALE UP
-    if (
-        state.cpuUsage > CONFIG.scaleUpThreshold &&
-        state.cpuUsage > state.previousCpu &&
-        state.podCount < CONFIG.maxPods
-    ) {
-
-        setSystemStatus('SCALING_UP');
-
-        await scaleUp();   // wait for backend
-
-        updateLog(
-            `CPU reached ${state.cpuUsage}% (up from ${state.previousCpu}%)<br>
-             Scaling up from ${oldPodCount} → ${oldPodCount + 1}`,
-            'log-action-up'
-        );
-
-        didScale = true;
+    // STABLE RANGE: 30-70% CPU (from CONFIG) remains stable
+    if (state.cpuUsage >= CONFIG.scaleDownThreshold && state.cpuUsage <= CONFIG.scaleUpThreshold) {
+        setSystemStatus('STABLE');
+        return;
     }
 
-    // SCALE DOWN
-    else if (
-        state.cpuUsage < CONFIG.scaleDownThreshold &&
-        state.cpuUsage < state.previousCpu &&
-        state.podCount > CONFIG.minPods
-    ) {
+    let didScale = false;
+    const oldPodCount = state.podCount;
 
+    // KUBERNETES HPA FORMULA-BASED SCALING
+    // Formula: desiredPods = ceil[currentPods * (currentCPU / targetCPU)]
+    let desiredPods = Math.ceil(
+        state.podCount * (state.cpuUsage / TARGET_CPU)
+    );
+
+    // Clamp values between min and max pods
+    desiredPods = Math.max(CONFIG.minPods, Math.min(CONFIG.maxPods, desiredPods));
+
+    // Determine if we need to move towards desiredPods
+    if (desiredPods > state.podCount) {
+        setSystemStatus('SCALING_UP');
+        didScale = await scaleUp();
+        if (didScale) {
+            updateLog(
+                `CPU: ${state.cpuUsage}% → Target Pods: ${desiredPods} → Scaling from ${oldPodCount} → ${state.podCount}`,
+                'log-action-up'
+            );
+        }
+    }
+    else if (desiredPods < state.podCount) {
         setSystemStatus('SCALING_DOWN');
-
-        await scaleDown();  // wait for backend
-
-        updateLog(
-            `CPU dropped to ${state.cpuUsage}% (down from ${state.previousCpu}%)<br>
-             Scaling down from ${oldPodCount} → ${oldPodCount - 1}`,
-            'log-action-down'
-        );
-
-        didScale = true;
+        didScale = await scaleDown();
+        if (didScale) {
+            updateLog(
+                `CPU: ${state.cpuUsage}% → Target Pods: ${desiredPods} → Scaling from ${oldPodCount} → ${state.podCount}`,
+                'log-action-down'
+            );
+        }
+    } else {
+        setSystemStatus('STABLE');
     }
 
     if (didScale) {
-
         // cooldown to simulate provisioning delay
         scaleCooldown = true;
-
         setTimeout(() => {
             scaleCooldown = false;
-            setSystemStatus('STABLE');
+            // After cooldown, trigger check to see if we still need to scale
+            checkAutoscaling();
         }, 1500);
     }
 }
@@ -345,11 +420,34 @@ els.cpuSlider.addEventListener('change', (e) => {
 });
 
 els.btnIncrease.addEventListener('click', () => {
-    setCpu(state.cpuUsage + 15);
+    if (!state.autoMode) setCpu(state.cpuUsage + 15);
 });
 
 els.btnDecrease.addEventListener('click', () => {
-    setCpu(state.cpuUsage - 15);
+    if (!state.autoMode) setCpu(state.cpuUsage - 15);
+});
+
+// Auto Mode Toggle logic
+els.autoBtn.addEventListener('click', () => {
+    state.autoMode = !state.autoMode;
+
+    if (state.autoMode) {
+        startAutoMode();
+        els.autoBtn.textContent = "Stop Auto Traffic";
+        els.autoBtn.classList.replace('btn-secondary', 'btn-primary');
+        els.cpuSlider.disabled = true;
+        els.btnIncrease.disabled = true;
+        els.btnDecrease.disabled = true;
+        updateLog("Auto Traffic Mode Started (Simulating Real Load)", "log-action-info");
+    } else {
+        stopAutoMode();
+        els.autoBtn.textContent = "Start Auto Traffic";
+        els.autoBtn.classList.replace('btn-primary', 'btn-secondary');
+        els.cpuSlider.disabled = false;
+        els.btnIncrease.disabled = false;
+        els.btnDecrease.disabled = false;
+        updateLog("Auto Traffic Mode Stopped", "log-action-info");
+    }
 });
 
 // Initialization
@@ -373,9 +471,11 @@ function init() {
 
     initCharts();
 
-    updateLog("System initialized with 2 pods. Target thresholds: Scale UP &gt; 70%, Scale DOWN &lt; 30%.");
+    updateLog("System initialized. Scaling using K8s HPA formula (Target CPU: 50%).");
 
-    // Start chart data interval
+    // Start periodic checks
+    checkBackend();
+    setInterval(checkBackend, 5000);
     setInterval(updateCharts, CONFIG.chartUpdateIntervalMs);
 }
 

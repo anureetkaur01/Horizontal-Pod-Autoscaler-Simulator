@@ -2,11 +2,17 @@ const express = require("express");
 const cors = require("cors");
 const { exec } = require("child_process");
 
+const path = require("path");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-let pods = [];
+// Serve frontend static files
+app.use(express.static(path.join(__dirname, "../frontend")));
+
+// Initialize with 1 dummy pod to match frontend initial state
+let pods = ["dummy-1"];
 
 // start container
 function startContainer(callback) {
@@ -75,8 +81,14 @@ app.get("/pods", (req, res) => {
 
 });
 
-app.listen(5000, () => {
-
-    console.log("Backend running on port 5000");
-
+const PORT = 5000;
+app.listen(PORT, () => {
+    console.log(`Backend running on port ${PORT}`);
+}).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Please kill the process using it or choose another port.`);
+    } else {
+        console.error("Server error:", err);
+    }
+    process.exit(1);
 });
